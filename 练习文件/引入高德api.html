@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高德地图显示</title>
+
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: "862f30c9d5219fa60ac04e49dc8f2521",
+        };
+    </script>
+    <script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=2.0&key=52353358b60fbbb17fd06a7335306755"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .button-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+
+        .map-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 交通图层按钮 */
+        .traffic-added {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .traffic-added:hover {
+            background-color: #45a049;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .traffic-removed {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .traffic-removed:hover {
+            background-color: #da190b;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 标记模式按钮 */
+        .marker-active {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .marker-active:hover {
+            background-color: #1976D2;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .marker-inactive {
+            background-color: #9E9E9E;
+            color: white;
+        }
+
+        .marker-inactive:hover {
+            background-color: #757575;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 删除按钮 */
+        .delete-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background-color: #F57C00;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 距离测量按钮 */
+        .distance-active {
+            background-color: #9C27B0;
+            color: white;
+        }
+
+        .distance-active:hover {
+            background-color: #7B1FA2;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .distance-inactive {
+            background-color: #607D8B;
+            color: white;
+        }
+
+        .distance-inactive:hover {
+            background-color: #455A64;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 面积测量按钮 */
+        .area-active {
+            background-color: #009688;
+            color: white;
+        }
+
+        .area-active:hover {
+            background-color: #00796B;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .area-inactive {
+            background-color: #795548;
+            color: white;
+        }
+
+        .area-inactive:hover {
+            background-color: #5D4037;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <div class="button-container">
+            <button id="trafficBtn" class="map-btn traffic-removed" onclick="toggleTraffic()">显示交通图层</button>
+            <button id="markerBtn" class="map-btn marker-inactive" onclick="toggleMarkerMode()">开启标记模式</button>
+            <button id="distanceBtn" class="map-btn distance-inactive" onclick="toggleDistanceMode()">测量距离</button>
+            <button id="areaBtn" class="map-btn area-inactive" onclick="toggleAreaMode()">测量面积</button>
+            <button id="deleteBtn" class="map-btn delete-btn" onclick="deleteAllMarkers()">删除所有标记</button>
+        </div>
+    </div>
+
+    <script>
+        var map = new AMap.Map("container", {
+            center: [114.30, 30.60],
+            zoom: 12
+        })
+
+        // 创建实时交通图层
+        var traffic = new AMap.TileLayer.Traffic({
+            autoRefresh: true,
+            interval: 180,
+        });
+
+        // 标记相关变量
+        var isMarkerMode = false;  // 标记模式开关
+        var markers = [];          // 存储所有标记
+
+        // 切换交通图层
+        function toggleTraffic() {
+            var btn = document.getElementById('trafficBtn');
+            if (traffic.map) {
+                console.log("移除交通图层");
+                map.remove(traffic);
+                btn.className = 'map-btn traffic-removed';
+                btn.textContent = '显示交通图层';
+            } else {
+                console.log("添加交通图层");
+                map.add(traffic);
+                btn.className = 'map-btn traffic-added';
+                btn.textContent = '隐藏交通图层';
+            }
+        }
+
+        // 切换标记模式
+        function toggleMarkerMode() {
+            var btn = document.getElementById('markerBtn');
+            isMarkerMode = !isMarkerMode;
+            if (isMarkerMode) {
+                btn.className = 'map-btn marker-active';
+                btn.textContent = '关闭标记模式';
+                console.log('✅ 标记模式已开启，点击地图添加标记');
+            } else {
+                btn.className = 'map-btn marker-inactive';
+                btn.textContent = '开启标记模式';
+                console.log('❌ 标记模式已关闭');
+            }
+        }
+
+        // 删除所有标记
+        function deleteAllMarkers() {
+            if (markers.length === 0) {
+                alert('没有可删除的标记！');
+                return;
+            }
+            
+            // 移除所有标记
+            for (var i = 0; i < markers.length; i++) {
+                map.remove(markers[i]);
+            }
+            
+            console.log('已删除 ' + markers.length + ' 个标记');
+            markers = [];  // 清空数组
+            
+            alert('成功删除所有标记！');
+        }
+
+        // 创建控件
+        AMap.plugin(['AMap.ToolBar', 'AMap.Scale', 'AMap.HawkEye', 'AMap.MapType'], function () {
+            map.addControl(new AMap.ToolBar());
+            map.addControl(new AMap.Scale());
+            map.addControl(new AMap.HawkEye());
+            map.addControl(new AMap.MapType());
+        });
+
+        // 点击地图事件（根据标记模式决定是否添加标记）
+        map.on('click', function (e) {
+            if (isMarkerMode) {
+                console.log('添加标记:', e.lnglat);
+                var marker = new AMap.Marker({
+                    position: e.lnglat
+                });
+                map.add(marker);
+                markers.push(marker);  // 保存到数组
+            }
+        });
+
+        // 距离测量相关变量
+        var isDistanceMode = false;
+        var distanceMarker1, distanceMarker2, distanceLine, distanceText;
+
+        // 切换距离测量模式
+        function toggleDistanceMode() {
+            var btn = document.getElementById('distanceBtn');
+            isDistanceMode = !isDistanceMode;
+            
+            if (isDistanceMode) {
+                // 开启测量模式 - 创建测距工具
+                createDistanceTools();
+                btn.className = 'map-btn distance-active';
+                btn.textContent = '关闭测距';
+                console.log('✅ 距离测量已开启，拖动两点可测距');
+            } else {
+                // 关闭测量模式 - 清除所有测距元素
+                clearDistanceTools();
+                btn.className = 'map-btn distance-inactive';
+                btn.textContent = '测量距离';
+                console.log('❌ 距离测量已关闭');
+            }
+        }
+
+        // 创建距离测量工具
+        function createDistanceTools() {
+            // 获取当前地图的边界范围
+            var bounds = map.getBounds();
+            var northEast = bounds.getNorthEast();  // 东北角（右上）
+            var southWest = bounds.getSouthWest();  // 西南角（左下）
+
+            // 计算两点位置（在视口范围内，稍微靠内一点）
+            var lngRange = northEast.lng - southWest.lng;
+            var latRange = northEast.lat - southWest.lat;
+
+            // 点1：左上区域（偏移20%）
+            var point1Lng = southWest.lng + lngRange * 0.25;
+            var point1Lat = northEast.lat - latRange * 0.25;
+
+            // 点2：右下区域（偏移20%）
+            var point2Lng = southWest.lng + lngRange * 0.75;
+            var point2Lat = northEast.lat - latRange * 0.75;
+
+            // 创建第一个可拖动的点
+            distanceMarker1 = new AMap.Marker({
+                map: map,
+                draggable: true,
+                position: new AMap.LngLat(point1Lng, point1Lat),
+                title: '起点'
+            });
+
+            // 创建第二个可拖动的点
+            distanceMarker2 = new AMap.Marker({
+                map: map,
+                draggable: true,
+                position: new AMap.LngLat(point2Lng, point2Lat),
+                title: '终点'
+            });
+
+            // 创建连线
+            distanceLine = new AMap.Polyline({
+                strokeColor: '#80d8ff',
+                isOutlined: true,
+                outlineColor: 'white',
+            });
+            distanceLine.setMap(map);
+
+            // 创建距离文字显示
+            distanceText = new AMap.Text({
+                text: '',
+                style: {
+                    'backgroundColor': '#29b6f6',
+                    'borderColor': '#29b6f6',
+                    'fontSize': '16px'
+                }
+            });
+            distanceText.setMap(map);
+
+            // 绑定拖动事件，实时计算距离
+            distanceMarker1.on('dragging', computeDistance);
+            distanceMarker2.on('dragging', computeDistance);
+
+            // 初始计算一次
+            computeDistance();
+        }
+
+        // 计算并显示距离
+        function computeDistance() {
+            if (!distanceMarker1 || !distanceMarker2) return;
+            
+            var p1 = distanceMarker1.getPosition();
+            var p2 = distanceMarker2.getPosition();
+            
+            // 计算中点位置（用于显示文字）
+            var textPos = p1.divideBy(2).add(p2.divideBy(2));
+            
+            // 计算距离（米）
+            var distance = Math.round(p1.distance(p2));
+            
+            // 更新连线
+            var path = [p1, p2];
+            distanceLine.setPath(path);
+            
+            // 更新文字位置和内容
+            distanceText.setPosition(textPos);
+            distanceText.setText('📏 距离: ' + distance + ' 米');
+            
+            console.log('当前距离:', distance, '米');
+        }
+
+        // 清除距离测量工具
+        function clearDistanceTools() {
+            if (distanceMarker1) {
+                map.remove(distanceMarker1);
+                distanceMarker1 = null;
+            }
+            if (distanceMarker2) {
+                map.remove(distanceMarker2);
+                distanceMarker2 = null;
+            }
+            if (distanceLine) {
+                map.remove(distanceLine);
+                distanceLine = null;
+            }
+            if (distanceText) {
+                map.remove(distanceText);
+                distanceText = null;
+            }
+            console.log('已清除所有测距元素');
+        }
+
+        // 面积测量相关变量
+        var isAreaMode = false;
+        var areaMarkers = [];  // 存储4个标记点
+        areaMarkers.length = 0;
+        var areaPolygon;      // 多边形
+        var areaText;         // 面积文字
+
+        // 切换面积测量模式
+        function toggleAreaMode() {
+            var btn = document.getElementById('areaBtn');
+            isAreaMode = !isAreaMode;
+
+            if (isAreaMode) {
+                createAreaTools();
+                btn.className = 'map-btn area-active';
+                btn.textContent = '关闭测面';
+                console.log('✅ 面积测量已开启，拖动四点可测面积');
+            } else {
+                clearAreaTools();
+                btn.className = 'map-btn area-inactive';
+                btn.textContent = '测量面积';
+                console.log('❌ 面积测量已关闭');
+            }
+        }
+
+        // 创建面积测量工具
+        function createAreaTools() {
+            // 获取当前地图的边界范围
+            var bounds = map.getBounds();
+            var northEast = bounds.getNorthEast();
+            var southWest = bounds.getSouthWest();
+
+            // 计算范围
+            var lngRange = northEast.lng - southWest.lng;
+            var latRange = northEast.lat - southWest.lat;
+
+            // 定义4个点的位置（形成一个矩形）
+            var points = [
+                { lng: southWest.lng + lngRange * 0.3, lat: northEast.lat - latRange * 0.3 },  // 左上
+                { lng: southWest.lng + lngRange * 0.7, lat: northEast.lat - latRange * 0.3 },  // 右上
+                { lng: southWest.lng + lngRange * 0.7, lat: northEast.lat - latRange * 0.7 },  // 右下
+                { lng: southWest.lng + lngRange * 0.3, lat: northEast.lat - latRange * 0.7 }   // 左下
+            ];
+
+            // 创建4个可拖动的标记点
+            for (var i = 0; i < 4; i++) {
+                var marker = new AMap.Marker({
+                    map: map,
+                    draggable: true,
+                    position: new AMap.LngLat(points[i].lng, points[i].lat),
+                    title: '顶点' + (i + 1)
+                });
+                
+                // 绑定拖动事件
+                marker.on('dragging', computeArea);
+                
+                areaMarkers.push(marker);
+            }
+
+            // 创建多边形（填充区域）
+            areaPolygon = new AMap.Polygon({
+                path: getMarkerPositions(),
+                fillColor: '#ffeb3b',
+                fillOpacity: 0.4,
+                strokeColor: '#fbc02d',
+                strokeWeight: 2,
+                strokeOpacity: 0.9
+            });
+            areaPolygon.setMap(map);
+
+            // 创建面积文字显示（初始位置在中心上方）
+            areaText = new AMap.Text({
+                text: '',
+                style: {
+                    'backgroundColor': '#009688',
+                    'borderColor': '#009688',
+                    'fontSize': '16px'
+                }
+            });
+            areaText.setMap(map);
+
+            // 初始计算一次
+            computeArea();
+        }
+
+        // 获取所有标记点的位置
+        function getMarkerPositions() {
+            var positions = [];
+            for (var i = 0; i < areaMarkers.length; i++) {
+                positions.push(areaMarkers[i].getPosition());
+            }
+            return positions;
+        }
+
+        // 计算并显示面积
+        function computeArea() {
+            if (areaMarkers.length < 4) return;
+
+            // 获取4个点的位置
+            var positions = getMarkerPositions();
+
+            // 更新多边形路径
+            areaPolygon.setPath(positions);
+
+            // 计算多边形面积（使用高德API的GeometryUtil）
+            var area = AMap.GeometryUtil.ringArea(positions);
+
+            // 格式化面积显示
+            var areaTextStr = '';
+            if (area >= 1000000) {
+                areaTextStr = '📐 面积: ' + (area / 1000000).toFixed(2) + ' 平方公里';
+            } else {
+                areaTextStr = '📐 面积: ' + Math.round(area) + ' 平方米';
+            }
+
+            // 计算中心点（用于显示文字）
+            var centerLng = 0, centerLat = 0;
+            for (var i = 0; i < positions.length; i++) {
+                centerLng += positions[i].lng;
+                centerLat += positions[i].lat;
+            }
+            centerLng /= positions.length;
+            centerLat /= positions.length;
+
+            // 找到最北边的点（用于将文字放在面上方）
+            var maxLat = positions[0].lat;
+            for (var j = 1; j < positions.length; j++) {
+                if (positions[j].lat > maxLat) {
+                    maxLat = positions[j].lat;
+                }
+            }
+
+            // 文字位置：中心经度，最北纬度再往上偏移一点
+            var textPosition = new AMap.LngLat(centerLng, maxLat + (centerLat - maxLat) * 0.3);
+
+            // 更新文字
+            areaText.setPosition(textPosition);
+            areaText.setText(areaTextStr);
+
+            console.log('当前面积:', areaTextStr);
+        }
+
+        // 清除面积测量工具
+        function clearAreaTools() {
+            // 移除4个标记点
+            for (var i = 0; i < areaMarkers.length; i++) {
+                map.remove(areaMarkers[i]);
+            }
+            areaMarkers = [];
+
+            // 移除多边形
+            if (areaPolygon) {
+                map.remove(areaPolygon);
+                areaPolygon = null;
+            }
+
+            // 移除文字
+            if (areaText) {
+                map.remove(areaText);
+                areaText = null;
+            }
+
+            console.log('已清除所有测面元素');
+        }
+
+
+    </script>
+</body>
+
+</html>
